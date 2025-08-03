@@ -1,162 +1,217 @@
 # MCP Documentation Server
 
-A Model Context Protocol (MCP) server that provides Claude Code with direct access to technical documentation, enabling more accurate and contextual development assistance.
+A Model Context Protocol (MCP) server that provides Claude Code with direct access to technical documentation from multiple sources, enabling more accurate and contextual development assistance.
 
 ## Overview
 
-This MCP server enhances Claude Code's capabilities by:
-- Providing real-time access to documentation (Electron, React, Node.js, etc.)
-- Searching and retrieving relevant API references
-- Finding code examples and best practices
-- Caching documentation for faster access
-- Supporting multiple documentation sources
+This MCP server enhances Claude Code's capabilities by providing real-time access to:
+- **Electron Documentation** - Complete API reference and examples
+- **React Documentation** - Component APIs and usage patterns  
+- **Node.js Documentation** - Runtime APIs and guides
+- **GitHub Documentation** - Repository content and API references
 
 ## Features
 
-- **Multi-source documentation support**: Electron, React, Node.js, and more
-- **Intelligent search**: Context-aware documentation retrieval
-- **Caching system**: Fast access to frequently used docs
-- **Example finder**: Locate relevant code examples
-- **API reference lookup**: Quick access to method signatures and usage
-- **Version-aware**: Handle different versions of technologies
+- 🔍 **Intelligent Search** - Search across multiple documentation sources simultaneously
+- 📚 **API Reference Lookup** - Get detailed documentation for specific APIs and methods
+- 💡 **Example Finder** - Locate relevant code examples with syntax highlighting
+- 🔄 **Migration Guides** - Version-to-version upgrade assistance
+- ⚡ **Advanced Caching** - Two-tier caching (memory + file) for optimal performance
+- 🔒 **Security Hardened** - SSRF protection, input validation, and secure file operations
+- 🐳 **Docker Ready** - Production deployment with Docker Compose
+- ✅ **Comprehensive Testing** - 105 tests covering unit, integration, and security scenarios
 
 ## Architecture
 
 ```
 src/
-├── tools/           # MCP tools exposed to Claude
-├── scrapers/        # Documentation scrapers for different sources
-├── cache/          # Caching system for performance
-├── utils/          # Shared utilities
-└── types.ts        # TypeScript type definitions
+├── tools/           # MCP tools (search, api_reference, examples, migration)
+├── scrapers/        # Documentation scrapers (Electron, React, Node.js, GitHub)
+├── cache/          # Two-tier caching system (memory + file storage)
+├── utils/          # Utilities (logging, parsing, cache management)
+├── server.ts       # MCP server implementation
+├── index.ts        # Application entry point
+└── types.ts        # TypeScript definitions and Zod schemas
 ```
 
-## Installation
+## Quick Start
 
-1. Clone this repository
-2. Install dependencies:
+### Prerequisites
+- **Node.js 20+** (LTS recommended for security)
+- **npm** or **yarn**
+
+### Installation
+
+1. **Clone and install**:
    ```bash
+   git clone https://github.com/Liquescent-Development/mcp-docs-server.git
+   cd mcp-docs-server
    npm install
    ```
-3. Copy environment configuration:
+
+2. **Configure environment**:
    ```bash
    cp .env.example .env
+   # Edit .env with your documentation source URLs
    ```
-4. Configure your documentation sources in `config/default.json`
-5. Build the project:
+
+3. **Build and start**:
    ```bash
    npm run build
+   npm start
    ```
 
 ## Configuration
 
-Configure documentation sources in `config/default.json`:
+### Environment Variables
 
-```json
-{
-  "documentation": {
-    "sources": {
-      "electron": {
-        "url": "https://electronjs.org/docs",
-        "enabled": true,
-        "cache_ttl": 3600
-      },
-      "react": {
-        "url": "https://react.dev/reference",
-        "enabled": true,
-        "cache_ttl": 3600
-      }
-    }
-  },
-  "cache": {
-    "type": "file",
-    "directory": "./cache",
-    "max_size": "100MB"
-  }
-}
+Create a `.env` file with your documentation sources:
+
+```bash
+# Documentation Sources (at least one required)
+DOCS_ELECTRON_URL=https://www.electronjs.org
+DOCS_REACT_URL=https://react.dev
+DOCS_NODE_URL=https://nodejs.org
+DOCS_GITHUB_URL=https://docs.github.com
+
+# GitHub Integration (optional, for higher rate limits)
+GITHUB_TOKEN=ghp_your_token_here
+
+# Server Configuration
+PORT=3000
+NODE_ENV=production
+
+# Caching
+CACHE_DIR=./cache
+CACHE_TTL=3600
+CACHE_STORAGE=both
+
+# Performance
+RATE_LIMIT_PER_MINUTE=60
+
+# Logging
+LOG_LEVEL=info
+```
+
+### Docker Deployment
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  mcp-docs-server:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DOCS_ELECTRON_URL=https://www.electronjs.org
+      - DOCS_REACT_URL=https://react.dev
+      - DOCS_NODE_URL=https://nodejs.org
+    volumes:
+      - ./cache:/app/cache
+      - ./logs:/app/logs
+    restart: unless-stopped
+```
+
+```bash
+docker-compose up -d
 ```
 
 ## Usage with Claude Code
 
-1. Start the MCP server:
-   ```bash
-   npm start
-   ```
+### 1. Configure Claude Code
 
-2. Configure Claude Code to use this MCP server by adding to your MCP configuration:
-   ```json
-   {
-     "mcpServers": {
-       "docs": {
-         "command": "node",
-         "args": ["/path/to/mcp-docs-server/dist/index.js"]
-       }
-     }
-   }
-   ```
+Add to your Claude Code MCP configuration:
 
-3. Use in Claude Code conversations:
-   ```
-   # Claude can now access documentation directly
-   "Help me implement Electron IPC communication"
-   # Claude will automatically search Electron docs for IPC examples
-   ```
+```json
+{
+  "mcpServers": {
+    "docs": {
+      "command": "node",
+      "args": ["/path/to/mcp-docs-server/dist/index.js"],
+      "env": {
+        "DOCS_ELECTRON_URL": "https://www.electronjs.org",
+        "DOCS_REACT_URL": "https://react.dev",
+        "DOCS_NODE_URL": "https://nodejs.org"
+      }
+    }
+  }
+}
+```
 
-## Available Tools
+### 2. Available Tools
 
-### `search_documentation`
-Search across all configured documentation sources.
+The server provides four MCP tools:
+
+#### `search_documentation`
+Search across multiple documentation sources:
 ```typescript
+// Claude Code will automatically use this when you ask:
+// "How do I create a window in Electron?"
 search_documentation({
-  query: "electron ipc main process",
-  technology: "electron", // optional
-  type: "api" | "guide" | "example" // optional
+  query: "create browser window",
+  sources: ["electron"],
+  type: "api",
+  limit: 10
 })
 ```
 
-### `get_api_reference`
-Get specific API documentation.
+#### `get_api_reference`
+Get detailed API documentation:
 ```typescript
+// "Show me the BrowserWindow API documentation"
 get_api_reference({
-  technology: "electron",
-  api: "BrowserWindow",
-  method: "loadURL" // optional
+  apiName: "BrowserWindow",
+  source: "electron",
+  version: "latest"
 })
 ```
 
-### `find_examples`
-Find code examples for specific use cases.
+#### `find_examples`
+Find code examples:
 ```typescript
+// "Find TypeScript examples for React hooks"
 find_examples({
-  technology: "electron",
-  use_case: "context menu",
-  language: "typescript" // optional
+  topic: "hooks",
+  sources: ["react"],
+  language: "typescript",
+  limit: 5
 })
 ```
 
-### `get_migration_guide`
-Get migration information between versions.
+#### `get_migration_guide`
+Get version migration guides:
 ```typescript
+// "How do I migrate from React 17 to 18?"
 get_migration_guide({
-  technology: "electron",
-  from_version: "22",
-  to_version: "latest"
+  source: "react", 
+  fromVersion: "17.0.0",
+  toVersion: "18.0.0"
 })
+```
+
+### 3. Example Conversations
+
+```text
+User: "I need to create an Electron app with a custom menu"
+
+Claude: I'll help you create an Electron app with a custom menu. Let me get the latest documentation for you.
+[Claude automatically uses search_documentation and get_api_reference]
+
+Based on the Electron documentation, here's how to create a custom menu:
+[Provides accurate, up-to-date code examples from real Electron docs]
 ```
 
 ## Development
 
-### Prerequisites
-- Node.js 18+
-- TypeScript 5+
-- npm or yarn
-
 ### Setup Development Environment
+
 ```bash
 # Install dependencies
 npm install
 
-# Run in development mode
+# Run in development mode (with hot reload)
 npm run dev
 
 # Run tests
@@ -164,88 +219,200 @@ npm test
 
 # Build for production
 npm run build
-```
 
-### Adding New Documentation Sources
-
-1. Create a new scraper in `src/scrapers/`
-2. Implement the `DocumentationScraper` interface
-3. Add configuration in `config/default.json`
-4. Register the scraper in `src/scrapers/index.ts`
-
-Example:
-```typescript
-// src/scrapers/my-tech.ts
-export class MyTechScraper implements DocumentationScraper {
-  async search(query: string): Promise<DocumentationResult[]> {
-    // Implementation
-  }
-  
-  async getApiReference(api: string): Promise<ApiReference> {
-    // Implementation
-  }
-}
+# Lint code
+npm run lint
 ```
 
 ### Testing
 
+The project includes a comprehensive test suite with 105 tests:
+
 ```bash
-# Run unit tests
+# Run all tests
+npm test
+
+# Run unit tests only
 npm run test:unit
 
-# Run integration tests
+# Run integration tests only
 npm run test:integration
 
-# Run all tests with coverage
+# Run tests with coverage
 npm run test:coverage
 ```
 
-## Configuration Options
+**Test Coverage:**
+- ✅ **Unit Tests (54)** - Scraper logic, caching, utilities
+- ✅ **Integration Tests (51)** - Real documentation endpoints
+- ✅ **Security Tests** - SSRF protection, input validation
+- ✅ **Performance Tests** - Rate limiting, timeouts
 
-See [CONFIGURATION.md](docs/CONFIGURATION.md) for detailed configuration options.
+### Adding New Documentation Sources
 
-## API Documentation
+1. **Create a scraper** in `src/scrapers/`:
+   ```typescript
+   // src/scrapers/my-docs.ts
+   import { BaseScraper } from './base.js';
+   
+   export class MyDocsScraper extends BaseScraper {
+     constructor(config: ScraperConfig) {
+       super(config, 'my-docs');
+     }
+     
+     async scrape(params: Record<string, any>): Promise<ScraperResult> {
+       // Implementation
+     }
+     
+     // ... other required methods
+   }
+   ```
 
-See [API.md](docs/API.md) for complete API documentation.
+2. **Add configuration** in `.env`:
+   ```bash
+   DOCS_MYDOCS_URL=https://mydocs.com
+   ```
 
-## Contributing
+3. **Register the scraper** in the server configuration
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+## Security Features
 
-## License
+- 🛡️ **SSRF Protection** - Blocks requests to private networks and localhost
+- 🔐 **Input Validation** - All inputs sanitized and validated with Zod schemas  
+- 📝 **Secure Logging** - Sensitive data automatically redacted from logs
+- 📁 **File Security** - Restricted permissions and path traversal protection
+- 🚫 **Error Handling** - Safe error messages that don't expose internal details
 
-MIT License - see LICENSE file for details.
+## Performance
 
-## Roadmap
+- ⚡ **Two-Tier Caching** - Memory cache + persistent file storage
+- 📊 **Rate Limiting** - Configurable per-source request limits
+- 🔄 **Concurrent Processing** - Batch requests with controlled concurrency
+- ⏱️ **Smart TTL** - Different cache durations for different content types
 
-- [ ] Support for more documentation sources (Vue, Angular, etc.)
-- [ ] AI-powered documentation summarization
-- [ ] Integration with IDE extensions
-- [ ] Real-time documentation updates
-- [ ] Custom documentation source plugins
-- [ ] Semantic search capabilities
+**Cache TTL by Content Type:**
+- Search results: 30 minutes
+- API references: 1 hour  
+- Code examples: 30 minutes
+- Migration guides: 2 hours
 
-## Troubleshooting
+## Documentation
+
+- 📖 **[API.md](docs/API.md)** - Complete API reference for all MCP tools
+- ⚙️ **[CONFIGURATION.md](docs/CONFIGURATION.md)** - Detailed configuration guide
+- 🧪 **[tests/README.md](tests/README.md)** - Testing guide and best practices
+
+## Monitoring & Troubleshooting
+
+### Health Check
+```bash
+# Check if server is running
+curl http://localhost:3000/health
+
+# View logs
+tail -f logs/combined.log
+
+# Check cache statistics
+# (Available through logging with debug level)
+```
 
 ### Common Issues
 
-**Server won't start**
-- Check that all dependencies are installed
-- Verify configuration files are valid JSON
-- Check that ports are not in use
+**"No documentation sources configured"**
+```bash
+# Ensure at least one DOCS_*_URL is set
+echo "DOCS_ELECTRON_URL=https://www.electronjs.org" >> .env
+```
 
-**Documentation not found**
-- Verify source URLs are accessible
-- Check cache directory permissions
-- Review scraper configurations
+**Rate limiting errors**
+```bash
+# Increase rate limit or add GitHub token
+RATE_LIMIT_PER_MINUTE=120
+GITHUB_TOKEN=your_github_token
+```
 
-**Performance issues**
-- Adjust cache TTL settings
-- Consider reducing concurrent scraping
-- Monitor memory usage
+**Cache permission errors**
+```bash
+# Fix cache directory permissions
+mkdir -p ./cache
+chmod 700 ./cache
+```
 
-For more help, see [DEVELOPMENT.md](docs/DEVELOPMENT.md) or open an issue.
+For detailed troubleshooting, see [CONFIGURATION.md](docs/CONFIGURATION.md).
+
+## Production Deployment
+
+### Minimum Requirements
+- **Node.js 20+** (for security updates)
+- **2GB RAM** (for caching)
+- **10GB disk space** (for cache storage)
+- **Reliable internet** (for documentation fetching)
+
+### Recommended Configuration
+```bash
+NODE_ENV=production
+LOG_LEVEL=warn
+CACHE_TTL=7200
+RATE_LIMIT_PER_MINUTE=120
+CACHE_STORAGE=both
+```
+
+### Process Management
+```bash
+# Using PM2
+npm install -g pm2
+pm2 start dist/index.js --name mcp-docs-server
+
+# Using Docker
+docker-compose up -d
+```
+
+## Contributing
+
+We welcome contributions! Please:
+
+1. **Fork** the repository
+2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
+3. **Make** your changes
+4. **Add** tests for new functionality
+5. **Ensure** all tests pass (`npm test`)
+6. **Submit** a pull request
+
+### Development Guidelines
+- Follow existing code style (ESLint configuration)
+- Add tests for new features
+- Update documentation as needed
+- Ensure security best practices
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Roadmap
+
+### Current Version (1.0.0)
+- ✅ Core MCP tools implementation
+- ✅ Multi-source documentation scraping
+- ✅ Advanced caching system
+- ✅ Security hardening
+- ✅ Comprehensive testing
+
+### Future Enhancements
+- [ ] **Additional Sources** - Vue.js, Angular, Python, Rust documentation
+- [ ] **AI Summarization** - Intelligent documentation summaries
+- [ ] **Semantic Search** - Vector-based content search
+- [ ] **Plugin System** - Custom documentation source plugins
+- [ ] **Real-time Sync** - Live documentation updates
+- [ ] **Analytics** - Usage metrics and performance monitoring
+- [ ] **GraphQL API** - Alternative to MCP protocol
+- [ ] **Web Interface** - Browser-based documentation explorer
+
+## Support
+
+- 📧 **Issues**: [GitHub Issues](https://github.com/Liquescent-Development/mcp-docs-server/issues)
+- 📚 **Documentation**: [docs/](docs/) directory
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/Liquescent-Development/mcp-docs-server/discussions)
+
+---
+
+**Built with ❤️ for the Claude Code community**
