@@ -1,11 +1,27 @@
 import dotenv from 'dotenv';
 import http from 'http';
+import fs from 'fs';
 import { MCPDocsServer } from './server.js';
 import { ServerConfig } from './types.js';
 import { logger } from './utils/logger.js';
 
 // Load environment variables
 dotenv.config();
+
+// Helper function to load secrets from Docker secrets or environment
+function loadSecret(envVar: string, secretPath?: string): string | undefined {
+  // Try Docker secrets first
+  if (secretPath) {
+    try {
+      return fs.readFileSync(secretPath, 'utf8').trim();
+    } catch (error) {
+      // Secret file not found, continue to env var
+    }
+  }
+  
+  // Fallback to environment variable
+  return process.env[envVar];
+}
 
 // Build server configuration from environment
 const config: ServerConfig = {
@@ -20,7 +36,7 @@ const config: ServerConfig = {
     github: process.env.DOCS_GITHUB_URL
   },
   github: {
-    token: process.env.GITHUB_TOKEN
+    token: loadSecret('GITHUB_TOKEN', '/run/secrets/github_token')
   }
 };
 

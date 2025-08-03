@@ -1,8 +1,10 @@
-# Build stage
-FROM node:20-alpine AS builder
+# Build stage - Pin to specific version and update packages
+FROM node:20.19.4-alpine3.22 AS builder
 
-# Install build dependencies
-RUN apk add --no-cache python3 make g++
+# Update Alpine packages and install build dependencies
+RUN apk update && apk upgrade && \
+    apk add --no-cache python3 make g++ && \
+    rm -rf /var/cache/apk/*
 
 # Set working directory
 WORKDIR /app
@@ -20,10 +22,12 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM node:20-alpine AS production
+FROM node:20.19.4-alpine3.22 AS production
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Update packages and install dumb-init for proper signal handling
+RUN apk update && apk upgrade && \
+    apk add --no-cache dumb-init && \
+    rm -rf /var/cache/apk/*
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
