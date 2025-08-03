@@ -19,6 +19,7 @@ This MCP server enhances Claude Code's capabilities by providing real-time acces
 - ⚡ **Advanced Caching** - Two-tier caching (memory + file) for optimal performance
 - 🔒 **Security Hardened** - SSRF protection, input validation, and secure file operations
 - 🐳 **Docker Ready** - Production deployment with Docker Compose
+- 🏥 **Health Monitoring** - Built-in health check endpoint at `/health`
 - ✅ **Comprehensive Testing** - 105 tests covering unit, integration, and security scenarios
 
 ## Architecture
@@ -95,28 +96,27 @@ LOG_LEVEL=info
 
 ### Docker Deployment
 
-```yaml
-# docker-compose.yml
-version: '3.8'
-services:
-  mcp-docs-server:
-    build: .
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - DOCS_ELECTRON_URL=https://www.electronjs.org
-      - DOCS_REACT_URL=https://react.dev
-      - DOCS_NODE_URL=https://nodejs.org
-    volumes:
-      - ./cache:/app/cache
-      - ./logs:/app/logs
-    restart: unless-stopped
+```bash
+# Quick start with Docker
+cp docker.env.example docker.env
+# Edit docker.env with your configuration
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Check health
+curl http://localhost:3000/health
 ```
 
-```bash
-docker-compose up -d
-```
+The Docker setup includes:
+- 🔐 **Security hardened** - Non-root user, minimal Alpine image
+- 💾 **Persistent storage** - Volumes for cache and logs
+- 🏥 **Health monitoring** - Built-in health checks at `/health`
+- 📊 **Resource limits** - CPU and memory constraints
+- 🔧 **Easy configuration** - All settings via environment variables
+
+See [DOCKER.md](DOCKER.md) for detailed Docker deployment guide.
 
 ## Usage with Claude Code
 
@@ -300,6 +300,7 @@ npm run test:coverage
 
 - 📖 **[API.md](docs/API.md)** - Complete API reference for all MCP tools
 - ⚙️ **[CONFIGURATION.md](docs/CONFIGURATION.md)** - Detailed configuration guide
+- 🐳 **[DOCKER.md](DOCKER.md)** - Docker deployment guide
 - 🧪 **[tests/README.md](tests/README.md)** - Testing guide and best practices
 
 ## Monitoring & Troubleshooting

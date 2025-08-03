@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  mcp-docs-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NODE_ENV=production
+    image: mcp-docs-server:latest
+    container_name: mcp-docs-server
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      # Server Configuration
+      - NODE_ENV=production
+      - PORT=${PORT:-3000}
+      
+      # Documentation Sources
+      - DOCS_ELECTRON_URL=${DOCS_ELECTRON_URL:-https://www.electronjs.org}
+      - DOCS_REACT_URL=${DOCS_REACT_URL:-https://react.dev}
+      - DOCS_NODE_URL=${DOCS_NODE_URL:-https://nodejs.org}
+      - DOCS_GITHUB_URL=${DOCS_GITHUB_URL:-https://docs.github.com}
+      
+      # GitHub Integration (optional)
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      
+      # Caching Configuration
+      - CACHE_DIR=/app/cache
+      - CACHE_TTL=${CACHE_TTL:-3600}
+      - CACHE_STORAGE=${CACHE_STORAGE:-both}
+      
+      # Performance Configuration
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-60}
+      
+      # Logging Configuration
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_DIR=/app/logs
+    volumes:
+      # Persistent cache storage
+      - cache_data:/app/cache
+      # Persistent logs
+      - log_data:/app/logs
+      # Optional: Mount custom configuration
+      - ./config:/app/config:ro
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Optional: Redis for enhanced caching (uncomment to enable)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: mcp-redis
+  #   restart: unless-stopped
+  #   command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - mcp-network
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+  # Optional: PostgreSQL for persistent data (uncomment to enable)
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: mcp-postgres
+  #   restart: unless-stopped
+  #   environment:
+  #     - POSTGRES_DB=mcp_docs
+  #     - POSTGRES_USER=${DB_USER:-mcp}
+  #     - POSTGRES_PASSWORD=${DB_PASSWORD:-changeme}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   networks:
+  #     - mcp-network
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-mcp}"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+volumes:
+  cache_data:
+    driver: local
+  log_data:
+    driver: local
+  # redis_data:
+  #   driver: local
+  # postgres_data:
+  #   driver: local
+
+networks:
+  mcp-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
