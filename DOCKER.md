@@ -17,6 +17,10 @@ cp docker.env.example docker.env
 
 # Edit docker.env with your configuration
 # At minimum, ensure at least one documentation source URL is set
+
+# For GitHub integration, create a secure token file:
+echo "ghp_your_github_token_here" > secrets/github_token.txt
+chmod 600 secrets/github_token.txt
 ```
 
 ### 3. Build and run with Docker Compose
@@ -251,11 +255,38 @@ docker run --rm -v mcp-docs-server_log_data:/data -v $(pwd):/backup alpine tar x
 
 ## Security Considerations
 
-1. **Use secrets for sensitive data**: Don't commit `.env` files with tokens
-2. **Run as non-root**: The container runs as user `nodejs` (UID 1001)
-3. **Network isolation**: Uses a dedicated bridge network
-4. **Resource limits**: Prevents resource exhaustion
-5. **Health checks**: Ensures service availability
+### Security Features Implemented
+
+1. **Docker Secrets**: GitHub tokens stored securely in `/run/secrets/`
+2. **Non-root User**: Container runs as user `nodejs` (UID 1001)
+3. **Network Isolation**: Uses dedicated bridge network with localhost-only binding
+4. **Security Context**: 
+   - `no-new-privileges:true` prevents privilege escalation
+   - Minimal capabilities (only CHOWN, SETGID, SETUID)
+   - All other capabilities dropped
+5. **Updated Base Images**: Uses pinned Alpine Linux with security updates
+6. **Resource Limits**: CPU/memory constraints prevent resource exhaustion
+7. **Health Checks**: Automated service monitoring
+
+### Setting up Secrets Securely
+
+```bash
+# Create secure GitHub token file
+mkdir -p secrets
+echo "ghp_your_actual_token_here" > secrets/github_token.txt
+chmod 600 secrets/github_token.txt
+
+# Verify secrets directory is in .gitignore
+grep -q "secrets/" .gitignore && echo "✅ Secrets excluded from git" || echo "❌ Add secrets/ to .gitignore"
+```
+
+### Security Best Practices
+
+- Never commit secret files to version control
+- Use Docker secrets instead of environment variables for sensitive data
+- Regularly update base images for security patches
+- Monitor container logs for security events
+- Use least-privilege principles (minimal capabilities)
 
 ## Monitoring
 

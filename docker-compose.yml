@@ -1,5 +1,9 @@
 version: '3.8'
 
+secrets:
+  github_token:
+    file: ./secrets/github_token.txt
+
 services:
   mcp-docs-server:
     build:
@@ -10,8 +14,10 @@ services:
     image: mcp-docs-server:latest
     container_name: mcp-docs-server
     restart: unless-stopped
+    secrets:
+      - github_token
     ports:
-      - "${PORT:-3000}:3000"
+      - "127.0.0.1:${PORT:-3000}:3000"
     environment:
       # Server Configuration
       - NODE_ENV=production
@@ -46,6 +52,14 @@ services:
       - ./config:/app/config:ro
     networks:
       - mcp-network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1))"]
       interval: 30s
