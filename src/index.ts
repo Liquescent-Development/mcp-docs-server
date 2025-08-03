@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import http from 'http';
 import { MCPDocsServer } from './server.js';
 import { ServerConfig } from './types.js';
 import { logger } from './utils/logger.js';
@@ -55,20 +56,42 @@ async function main(): Promise<void> {
     // Validate configuration
     validateConfig(config);
 
-    // Create and start server
-    const server = new MCPDocsServer(config);
-    await server.start();
+    // Create and start MCP server
+    const mcpServer = new MCPDocsServer(config);
+    await mcpServer.start();
+
+    // Create simple HTTP health check server
+    const healthServer = http.createServer((req, res) => {
+      if (req.url === '/health' && req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+          status: 'healthy',
+          service: 'mcp-docs-server',
+          timestamp: new Date().toISOString()
+        }));
+      } else {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not Found');
+      }
+    });
+
+    // Start health check server
+    healthServer.listen(config.port, () => {
+      logger.info(`Health check server listening on port ${config.port}`);
+    });
 
     // Handle graceful shutdown
     process.on('SIGINT', async () => {
       logger.info('Shutting down server...');
-      await server.stop();
+      healthServer.close();
+      await mcpServer.stop();
       process.exit(0);
     });
 
     process.on('SIGTERM', async () => {
       logger.info('Shutting down server...');
-      await server.stop();
+      healthServer.close();
+      await mcpServer.stop();
       process.exit(0);
     });
 
