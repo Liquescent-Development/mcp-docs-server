@@ -61,3 +61,6 @@ temp/
 
 # Documentation cache
 docs-cache/
+
+# CLAUDE.md files (user-specific, not for open source sharing)
+CLAUDE.md
