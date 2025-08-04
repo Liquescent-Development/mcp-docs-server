@@ -22,8 +22,8 @@ RUN npm ci --ignore-scripts
 # Copy source code
 COPY . .
 
-# Build TypeScript using the locally installed TypeScript compiler
-RUN ./node_modules/.bin/tsc
+# Run install scripts to set up .bin directory, then build
+RUN npm run prepare
 
 # Production stage
 FROM node:20.19.4-alpine3.22 AS production
