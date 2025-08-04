@@ -18,8 +18,8 @@ RUN npm ci --ignore-scripts
 # Copy source code
 COPY . .
 
-# Build TypeScript (skip if tsc not available, assuming pre-built)
-RUN npx tsc --version && npm run build || echo "TypeScript not found, assuming pre-built dist/"
+# Build TypeScript
+RUN npm run build
 
 # Production stage
 FROM node:20.19.4-alpine3.22 AS production
