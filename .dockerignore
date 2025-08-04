@@ -72,6 +72,5 @@ CLAUDE.md
 .eslintrc*
 .prettierrc*
 .editorconfig
-tsconfig.json
 jest.config.*
 *.map
