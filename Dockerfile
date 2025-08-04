@@ -16,7 +16,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install all dependencies (including dev dependencies for build)
-RUN npm ci
+# Skip prepare script since we haven't copied source code yet
+RUN npm ci --ignore-scripts
 
 # Copy source code
 COPY . .
