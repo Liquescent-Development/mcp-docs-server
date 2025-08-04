@@ -49,6 +49,12 @@ main() {
     cd "$PROJECT_DIR"
     
     # Ensure we have the latest code
+    log_info "Building TypeScript locally first..."
+    npm run build || {
+        log_error "Failed to build TypeScript. Run 'npm install' first."
+        exit 1
+    }
+    
     log_info "Building latest Docker images..."
     docker-compose -f docker-compose.test.yml build --no-cache
     

@@ -12,13 +12,13 @@ RUN addgroup -g 1001 -S testuser && \
 WORKDIR /app
 
 # Copy package files for test dependencies
-COPY tests/integration/package*.json ./
+COPY package*.json ./
 
 # Install test dependencies
-RUN npm ci --only=production
+RUN npm install --only=production
 
 # Copy test files
-COPY tests/integration/ ./tests/
+COPY . ./tests/
 
 # Create test results directory
 RUN mkdir -p test-results && chown -R testuser:testuser /app

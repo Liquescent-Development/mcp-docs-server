@@ -7,6 +7,10 @@ services:
       dockerfile: Dockerfile
       args:
         - NODE_ENV=test
+      # Mount dist directory for faster builds during testing
+      # Remove this line when running in CI/CD
+      cache_from:
+        - type=local,src=dist
     image: mcp-docs-server:test
     container_name: mcp-docs-server-test
     environment:
@@ -57,8 +61,8 @@ services:
   # Integration test runner
   integration-tests:
     build:
-      context: .
-      dockerfile: tests/integration/Dockerfile.test
+      context: ./tests/integration
+      dockerfile: Dockerfile.test
     container_name: integration-tests
     depends_on:
       mcp-docs-server-test:

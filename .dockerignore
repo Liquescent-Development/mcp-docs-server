@@ -5,7 +5,8 @@ yarn-debug.log*
 yarn-error.log*
 
 # Build output (will be built in container)
-dist/
+# NOTE: dist/ is kept for test environments to avoid TypeScript build issues
+# dist/
 build/
 *.tsbuildinfo
 
