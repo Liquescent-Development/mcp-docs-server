@@ -15,15 +15,11 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install all dependencies (including dev dependencies for build)
-# Skip prepare script since we haven't copied source code yet
-RUN npm ci --ignore-scripts
-
 # Copy source code
 COPY . .
 
-# Run install scripts to set up .bin directory, then build
-RUN npm run prepare
+# Install all dependencies and build
+RUN npm ci && npm run build
 
 # Production stage
 FROM node:20.19.4-alpine3.22 AS production
