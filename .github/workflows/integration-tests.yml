@@ -10,8 +10,13 @@ on:
     - cron: '0 2 * * *'
 
 env:
-  DOCKER_BUILDKIT: 1
-  COMPOSE_DOCKER_CLI_BUILD: 1
+  DOCKER_BUILDKIT: 0
+  COMPOSE_DOCKER_CLI_BUILD: 0
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
 
 jobs:
   integration-tests:
@@ -28,17 +33,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+    - name: Verify Docker Compose is available
+      run: |
+        docker compose version
       
-    - name: Cache Docker layers
-      uses: actions/cache@v4
-      with:
-        path: /tmp/.buildx-cache
-        key: ${{ runner.os }}-buildx-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-buildx-
-    
     - name: Create test secrets directory
       run: |
         mkdir -p secrets
@@ -47,19 +45,21 @@ jobs:
     
     - name: Build Docker images
       run: |
-        docker-compose -f docker-compose.test.yml build \
-          --build-arg BUILDKIT_INLINE_CACHE=1 \
-          --cache-from type=local,src=/tmp/.buildx-cache \
-          --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max
+        docker compose -f docker-compose.test.yml build
+    
+    - name: Create test results directory with proper permissions
+      run: |
+        mkdir -p test-results
+        chmod 777 test-results
     
     - name: Start test services
       run: |
-        docker-compose -f docker-compose.test.yml up -d mcp-docs-server-test
+        docker compose -f docker-compose.test.yml up -d mcp-docs-server-test
         
     - name: Wait for service health
       run: |
         timeout 180 bash -c '
-          until docker-compose -f docker-compose.test.yml exec -T mcp-docs-server-test curl -f http://localhost:3000/health; do
+          until [ "$(docker inspect mcp-docs-server-test --format="{{.State.Health.Status}}" 2>/dev/null || echo "starting")" = "healthy" ]; do
             echo "Waiting for service to be ready..."
             sleep 5
           done
@@ -67,13 +67,7 @@ jobs:
     
     - name: Run integration tests
       run: |
-        docker-compose -f docker-compose.test.yml run --rm integration-tests
-        
-    - name: Copy test results
-      if: always()
-      run: |
-        mkdir -p test-results/integration
-        docker cp integration-tests:/app/test-results/. test-results/integration/ 2>/dev/null || echo "No test results to copy"
+        docker compose -f docker-compose.test.yml run --rm integration-tests
         
     - name: Upload test results
       if: always()
@@ -88,29 +82,25 @@ jobs:
       uses: dorny/test-reporter@v1
       with:
         name: Integration Tests (Node ${{ matrix.node-version }})
-        path: test-results/integration/integration-results.xml
+        path: test-results/integration-results.xml
         reporter: java-junit
-        fail-on-error: true
+        fail-on-error: false
+      continue-on-error: true
         
     - name: Show service logs on failure
       if: failure()
       run: |
         echo "=== MCP Server Logs ==="
-        docker-compose -f docker-compose.test.yml logs mcp-docs-server-test
+        docker compose -f docker-compose.test.yml logs mcp-docs-server-test
         echo "=== Test Runner Logs ==="
-        docker-compose -f docker-compose.test.yml logs integration-tests
+        docker compose -f docker-compose.test.yml logs integration-tests
         
     - name: Cleanup
       if: always()
       run: |
-        docker-compose -f docker-compose.test.yml down --volumes --remove-orphans
+        docker compose -f docker-compose.test.yml down --volumes --remove-orphans
         docker system prune -f --volumes
         
-    - name: Move cache
-      if: always()
-      run: |
-        rm -rf /tmp/.buildx-cache
-        mv /tmp/.buildx-cache-new /tmp/.buildx-cache 2>/dev/null || true
 
   security-scan:
     name: Security Scan
@@ -155,8 +145,9 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+    - name: Verify Docker Compose is available
+      run: |
+        docker compose version
       
     - name: Create test secrets
       run: |
@@ -166,21 +157,21 @@ jobs:
         
     - name: Build and start services
       run: |
-        docker-compose -f docker-compose.test.yml up -d mcp-docs-server-test
+        docker compose -f docker-compose.test.yml up -d mcp-docs-server-test
         
     - name: Wait for service
       run: |
         timeout 180 bash -c '
-          until docker-compose -f docker-compose.test.yml exec -T mcp-docs-server-test curl -f http://localhost:3000/health; do
+          until docker compose -f docker-compose.test.yml exec -T mcp-docs-server-test curl -f http://localhost:3000/health; do
             sleep 5
           done
         '
         
     - name: Run performance tests
       run: |
-        docker-compose -f docker-compose.test.yml run --rm integration-tests npm run test:integration -- --testNamePattern="Performance"
+        docker compose -f docker-compose.test.yml run --rm integration-tests npm run test:integration -- --testNamePattern="Performance"
         
     - name: Cleanup
       if: always()
       run: |
-        docker-compose -f docker-compose.test.yml down --volumes --remove-orphans
+        docker compose -f docker-compose.test.yml down --volumes --remove-orphans

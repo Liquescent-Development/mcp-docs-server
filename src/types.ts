@@ -106,9 +106,9 @@ export interface ServerConfig {
 // Error types
 export class ScraperError extends Error {
   constructor(
-    message: string,
+    override message: string,
     public source: string,
-    public cause?: Error
+    public override cause?: Error
   ) {
     super(message);
     this.name = 'ScraperError';
@@ -116,7 +116,7 @@ export class ScraperError extends Error {
 }
 
 export class CacheError extends Error {
-  constructor(message: string, public cause?: Error) {
+  constructor(override message: string, public override cause?: Error) {
     super(message);
     this.name = 'CacheError';
   }

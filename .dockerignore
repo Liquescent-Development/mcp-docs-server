@@ -17,9 +17,10 @@ build/
 .env.test.local
 .env.production.local
 
-# Cache and temporary files
+# Cache and temporary files (exclude runtime cache, not source code)
 .cache/
-cache/
+/cache/
+!src/cache/
 .npm
 .yarn
 tmp/
@@ -72,6 +73,5 @@ CLAUDE.md
 .eslintrc*
 .prettierrc*
 .editorconfig
-tsconfig.json
 jest.config.*
 *.map

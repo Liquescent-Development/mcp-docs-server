@@ -16,9 +16,9 @@ build/
 .env.test.local
 .env.production.local
 
-# Cache directories
+# Cache directories (runtime cache, not source code)
 .cache/
-cache/
+/cache/
 .npm
 .yarn
 

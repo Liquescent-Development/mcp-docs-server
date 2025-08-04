@@ -2,8 +2,8 @@
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022"],
-    "module": "ESNext",
-    "moduleResolution": "node",
+    "module": "Node16",
+    "moduleResolution": "Node16",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "strict": true,
@@ -16,10 +16,15 @@
     "rootDir": "./src",
     "resolveJsonModule": true,
     "allowImportingTsExtensions": false,
+    "allowJs": true,
     "noEmit": false,
     "isolatedModules": true,
     "verbatimModuleSyntax": false,
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vitest/globals"],
+    // Additional security-focused options
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true
   },
   "include": [
     "src/**/*"
