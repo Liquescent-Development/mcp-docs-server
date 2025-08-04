@@ -22,8 +22,8 @@ RUN npm ci --ignore-scripts
 # Copy source code
 COPY . .
 
-# Build TypeScript
-RUN npm run build
+# Run prepare scripts to set up binaries, then build
+RUN npm rebuild && npm run build
 
 # Production stage
 FROM node:20.19.4-alpine3.22 AS production
