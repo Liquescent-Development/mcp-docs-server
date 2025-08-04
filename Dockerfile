@@ -18,8 +18,8 @@ COPY package*.json ./
 # Copy source code
 COPY . .
 
-# Install all dependencies and build
-RUN npm ci && npm run build
+# Install all dependencies with scripts to set up binaries properly
+RUN npm install && npm run build
 
 # Production stage
 FROM node:20.19.4-alpine3.22 AS production
