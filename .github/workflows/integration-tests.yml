@@ -49,7 +49,7 @@ jobs:
     - name: Wait for service health
       run: |
         timeout 180 bash -c '
-          until docker compose -f docker-compose.test.yml exec -T mcp-docs-server-test curl -f http://localhost:3000/health; do
+          until [ "$(docker compose -f docker-compose.test.yml ps mcp-docs-server-test --format json | jq -r ".[0].Health")" = "healthy" ]; do
             echo "Waiting for service to be ready..."
             sleep 5
           done
