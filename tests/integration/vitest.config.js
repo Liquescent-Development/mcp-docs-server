@@ -8,7 +8,7 @@ export default defineConfig({
     hookTimeout: 10000,
     teardownTimeout: 5000,
     setupFiles: ['./setup.js'],
-    include: ['tests/**/*.test.js'],
+    include: ['./tests/**/*.test.js'],
     exclude: ['node_modules/**', 'dist/**'],
     reporters: ['verbose', 'junit'],
     outputFile: {

@@ -42,6 +42,7 @@
     "cheerio": "^1.0.0-rc.12",
     "config": "^3.3.9",
     "dotenv": "^17.2.1",
+    "eventsource": "^4.0.0",
     "node-cache": "^5.1.2",
     "winston": "^3.11.0",
     "zod": "^3.22.4"

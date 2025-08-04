@@ -72,7 +72,7 @@ main() {
     interval=5
     
     while [ $elapsed -lt $timeout ]; do
-        if docker-compose -f docker-compose.test.yml exec -T mcp-docs-server-test curl -f http://localhost:3000/health >/dev/null 2>&1; then
+        if docker-compose -f docker-compose.test.yml exec -T mcp-docs-server-test wget -q -O /dev/null http://localhost:3000/health; then
             log_success "Server is ready!"
             break
         fi

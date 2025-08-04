@@ -140,9 +140,9 @@ export class DocumentationParser {
   }
 
   /**
-   * Extract structured content from an element
+   * Extract structured content from an element (public method)
    */
-  private extractContent(element: cheerio.Cheerio<any>): string {
+  extractContent(element: cheerio.Cheerio<any>): string {
     // Remove script and style tags
     element.find('script, style').remove();
     

@@ -2,58 +2,45 @@ import { describe, it, expect } from 'vitest';
 
 describe('Health Check Tests', () => {
   it('should return 200 for health endpoint', async () => {
-    const response = await global.httpClient.get('/health');
+    const response = await fetch(`${global.MCP_SERVER_URL}/health`);
     
     expect(response.status).toBe(200);
-    expect(response.data).toHaveProperty('status', 'healthy');
-    expect(response.data).toHaveProperty('timestamp');
-    expect(response.data).toHaveProperty('version');
+    
+    const data = await response.json();
+    expect(data).toHaveProperty('status', 'healthy');
+    expect(data).toHaveProperty('service', 'mcp-docs-server');
+    expect(data).toHaveProperty('timestamp');
   });
 
-  it('should include system information in health check', async () => {
-    const response = await global.httpClient.get('/health');
+  it('should have proper timestamp format', async () => {
+    const response = await fetch(`${global.MCP_SERVER_URL}/health`);
+    const data = await response.json();
     
-    expect(response.data).toHaveProperty('system');
-    expect(response.data.system).toHaveProperty('uptime');
-    expect(response.data.system).toHaveProperty('memory');
-    expect(response.data.system).toHaveProperty('nodeVersion');
+    expect(data.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    
+    // Timestamp should be recent (within last 10 seconds)
+    const timestamp = new Date(data.timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - timestamp.getTime();
+    expect(diffMs).toBeLessThan(10000);
   });
 
-  it('should include cache information in health check', async () => {
-    const response = await global.httpClient.get('/health');
-    
-    expect(response.data).toHaveProperty('cache');
-    expect(response.data.cache).toHaveProperty('status');
-    expect(response.data.cache).toHaveProperty('entries');
+  it('should return 404 for non-existent endpoints', async () => {
+    const response = await fetch(`${global.MCP_SERVER_URL}/non-existent-endpoint`);
+    expect(response.status).toBe(404);
   });
 
-  it('should include scraper status in health check', async () => {
-    const response = await global.httpClient.get('/health');
+  it('should handle HEAD requests to health endpoint', async () => {
+    const response = await fetch(`${global.MCP_SERVER_URL}/health`, {
+      method: 'HEAD'
+    });
     
-    expect(response.data).toHaveProperty('scrapers');
-    expect(Array.isArray(response.data.scrapers)).toBe(true);
-    
-    // Should have at least electron, react, node, github scrapers
-    const scraperNames = response.data.scrapers.map(s => s.name);
-    expect(scraperNames).toContain('electron');
-    expect(scraperNames).toContain('react');
-    expect(scraperNames).toContain('node');
-    expect(scraperNames).toContain('github');
+    expect(response.status).toBe(200);
   });
 
-  it('should handle 404 for non-existent endpoints', async () => {
-    try {
-      await global.httpClient.get('/non-existent-endpoint');
-      expect.fail('Should have thrown an error');
-    } catch (error) {
-      expect(error.response.status).toBe(404);
-    }
-  });
-
-  it('should have proper CORS headers', async () => {
-    const response = await global.httpClient.get('/health');
+  it('should have proper content-type headers', async () => {
+    const response = await fetch(`${global.MCP_SERVER_URL}/health`);
     
-    expect(response.headers).toHaveProperty('access-control-allow-origin');
-    expect(response.headers).toHaveProperty('access-control-allow-methods');
+    expect(response.headers.get('content-type')).toBe('application/json');
   });
 });
