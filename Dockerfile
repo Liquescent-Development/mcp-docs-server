@@ -18,8 +18,8 @@ RUN npm ci --ignore-scripts
 # Copy source code
 COPY . .
 
-# Build TypeScript
-RUN npm run build
+# Build TypeScript - Debug cache directory
+RUN ls -la src/cache/ && npm run build
 
 # Production stage
 FROM node:20.19.4-alpine3.22 AS production
