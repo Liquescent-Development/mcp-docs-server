@@ -42,6 +42,11 @@ jobs:
       run: |
         docker compose -f docker-compose.test.yml build
     
+    - name: Create test results directory with proper permissions
+      run: |
+        mkdir -p test-results
+        chmod 777 test-results
+    
     - name: Start test services
       run: |
         docker compose -f docker-compose.test.yml up -d mcp-docs-server-test
