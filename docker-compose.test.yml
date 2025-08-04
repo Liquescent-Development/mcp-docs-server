@@ -7,10 +7,6 @@ services:
       dockerfile: Dockerfile
       args:
         - NODE_ENV=test
-      # Mount dist directory for faster builds during testing
-      # Remove this line when running in CI/CD
-      cache_from:
-        - type=local,src=dist
     image: mcp-docs-server:test
     container_name: mcp-docs-server-test
     environment:
