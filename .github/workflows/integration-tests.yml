@@ -35,13 +35,6 @@ jobs:
       run: |
         docker compose version
       
-    - name: Cache Docker layers
-      uses: actions/cache@v4
-      with:
-        path: /tmp/.buildx-cache
-        key: ${{ runner.os }}-buildx-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-buildx-
     
     - name: Create test secrets directory
       run: |
@@ -52,9 +45,7 @@ jobs:
     - name: Build Docker images
       run: |
         docker compose -f docker-compose.test.yml build \
-          --build-arg BUILDKIT_INLINE_CACHE=1 \
-          --cache-from type=local,src=/tmp/.buildx-cache \
-          --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max
+          --build-arg BUILDKIT_INLINE_CACHE=1
     
     - name: Start test services
       run: |
@@ -110,11 +101,6 @@ jobs:
         docker compose -f docker-compose.test.yml down --volumes --remove-orphans
         docker system prune -f --volumes
         
-    - name: Move cache
-      if: always()
-      run: |
-        rm -rf /tmp/.buildx-cache
-        mv /tmp/.buildx-cache-new /tmp/.buildx-cache 2>/dev/null || true
 
   security-scan:
     name: Security Scan
