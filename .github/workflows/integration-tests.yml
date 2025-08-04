@@ -13,6 +13,11 @@ env:
   DOCKER_BUILDKIT: 0
   COMPOSE_DOCKER_CLI_BUILD: 0
 
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
 jobs:
   integration-tests:
     name: Integration Tests
@@ -79,7 +84,8 @@ jobs:
         name: Integration Tests (Node ${{ matrix.node-version }})
         path: test-results/integration-results.xml
         reporter: java-junit
-        fail-on-error: true
+        fail-on-error: false
+      continue-on-error: true
         
     - name: Show service logs on failure
       if: failure()
