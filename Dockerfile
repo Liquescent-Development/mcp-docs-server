@@ -22,8 +22,8 @@ RUN npm ci --ignore-scripts
 # Copy source code
 COPY . .
 
-# Run prepare scripts to set up binaries, then build
-RUN npm rebuild && npm run build
+# Build TypeScript using npx to find tsc in node_modules
+RUN npx tsc
 
 # Production stage
 FROM node:20.19.4-alpine3.22 AS production
