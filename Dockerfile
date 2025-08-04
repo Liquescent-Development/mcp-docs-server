@@ -1,9 +1,6 @@
 # Build stage - Pin to specific version and update packages
 FROM node:20.19.4-alpine3.22 AS builder
 
-# Accept build arg for NODE_ENV
-ARG NODE_ENV=production
-
 # Update Alpine packages and install build dependencies
 RUN apk update && apk upgrade && \
     apk add --no-cache python3 make g++ && \
@@ -15,11 +12,14 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
+# Install all dependencies (including dev)
+RUN npm ci --ignore-scripts
+
 # Copy source code
 COPY . .
 
-# Install all dependencies with scripts to set up binaries properly
-RUN npm install && npm run build
+# Build TypeScript
+RUN npm run build
 
 # Production stage
 FROM node:20.19.4-alpine3.22 AS production
@@ -39,9 +39,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install only production dependencies
-# Skip prepare script since we already built in the previous stage
-RUN npm ci --omit=dev --ignore-scripts && \
+# Install only production dependencies (skip prepare script)
+RUN npm ci --only=production --ignore-scripts && \
     npm cache clean --force
 
 # Copy built application from builder
