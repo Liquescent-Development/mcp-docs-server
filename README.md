@@ -20,7 +20,7 @@ This MCP server enhances Claude Code's capabilities by providing real-time acces
 - 🔒 **Security Hardened** - SSRF protection, input validation, and secure file operations
 - 🐳 **Docker Ready** - Production deployment with Docker Compose
 - 🏥 **Health Monitoring** - Built-in health check endpoint at `/health`
-- ✅ **Comprehensive Testing** - 105 tests covering unit, integration, and security scenarios
+- ✅ **Comprehensive Testing** - Full integration test suite with Docker-based testing environment
 
 ## Architecture
 
@@ -226,27 +226,48 @@ npm run lint
 
 ### Testing
 
-The project includes a comprehensive test suite with 105 tests:
+The project includes a comprehensive Docker-based integration test suite:
 
 ```bash
-# Run all tests
-npm test
+# Run all tests (unit + integration)
+npm run test:all
 
 # Run unit tests only
 npm run test:unit
 
-# Run integration tests only
+# Run integration tests with Docker
 npm run test:integration
+
+# Run integration tests in CI mode
+npm run test:integration:ci
+
+# Run performance tests
+npm run test:performance
 
 # Run tests with coverage
 npm run test:coverage
 ```
 
-**Test Coverage:**
-- ✅ **Unit Tests (54)** - Scraper logic, caching, utilities
-- ✅ **Integration Tests (51)** - Real documentation endpoints
-- ✅ **Security Tests** - SSRF protection, input validation
-- ✅ **Performance Tests** - Rate limiting, timeouts
+**Test Architecture:**
+- 🏗️ **Docker-based Integration Tests** - Full system testing in isolated environment
+- 🔍 **MCP Tools Testing** - WebSocket-based testing of all four MCP tools
+- 🏥 **Health & Monitoring** - System health and performance validation
+- 🛡️ **Security Testing** - Error handling, input validation, SSRF protection
+- ⚡ **Performance Testing** - Load testing, memory usage, response times
+
+**Quick Testing:**
+```bash
+# Using Make commands (recommended)
+make test-integration    # Full integration test suite
+make test-performance    # Performance tests only
+make quick-test         # Fast health check
+make ci                 # CI pipeline simulation
+
+# Using test script directly
+./scripts/run-integration-tests.sh
+```
+
+See [TESTING.md](TESTING.md) for detailed testing guide and architecture.
 
 ### Adding New Documentation Sources
 

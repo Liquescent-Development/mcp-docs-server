@@ -1,0 +1,186 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      matrix:
+        node-version: ['20']
+      fail-fast: false
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Cache Docker layers
+      uses: actions/cache@v4
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
+    
+    - name: Create test secrets directory
+      run: |
+        mkdir -p secrets
+        echo "dummy-token-for-testing" > secrets/github_token.txt
+        chmod 600 secrets/github_token.txt
+    
+    - name: Build Docker images
+      run: |
+        docker-compose -f docker-compose.test.yml build \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          --cache-from type=local,src=/tmp/.buildx-cache \
+          --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max
+    
+    - name: Start test services
+      run: |
+        docker-compose -f docker-compose.test.yml up -d mcp-docs-server-test
+        
+    - name: Wait for service health
+      run: |
+        timeout 180 bash -c '
+          until docker-compose -f docker-compose.test.yml exec -T mcp-docs-server-test curl -f http://localhost:3000/health; do
+            echo "Waiting for service to be ready..."
+            sleep 5
+          done
+        '
+    
+    - name: Run integration tests
+      run: |
+        docker-compose -f docker-compose.test.yml run --rm integration-tests
+        
+    - name: Copy test results
+      if: always()
+      run: |
+        mkdir -p test-results/integration
+        docker cp integration-tests:/app/test-results/. test-results/integration/ 2>/dev/null || echo "No test results to copy"
+        
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: integration-test-results-node-${{ matrix.node-version }}
+        path: test-results/
+        retention-days: 30
+        
+    - name: Publish test results
+      if: always()
+      uses: dorny/test-reporter@v1
+      with:
+        name: Integration Tests (Node ${{ matrix.node-version }})
+        path: test-results/integration/integration-results.xml
+        reporter: java-junit
+        fail-on-error: true
+        
+    - name: Show service logs on failure
+      if: failure()
+      run: |
+        echo "=== MCP Server Logs ==="
+        docker-compose -f docker-compose.test.yml logs mcp-docs-server-test
+        echo "=== Test Runner Logs ==="
+        docker-compose -f docker-compose.test.yml logs integration-tests
+        
+    - name: Cleanup
+      if: always()
+      run: |
+        docker-compose -f docker-compose.test.yml down --volumes --remove-orphans
+        docker system prune -f --volumes
+        
+    - name: Move cache
+      if: always()
+      run: |
+        rm -rf /tmp/.buildx-cache
+        mv /tmp/.buildx-cache-new /tmp/.buildx-cache 2>/dev/null || true
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Build Docker image for scanning
+      run: |
+        docker build -t mcp-docs-server:scan .
+        
+    - name: Run security scan with Trivy
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: mcp-docs-server:scan
+        format: sarif
+        output: trivy-results.sarif
+        
+    - name: Upload security scan results
+      if: always()
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: trivy-results.sarif
+        
+    - name: Run Docker Scout (if available)
+      run: |
+        if command -v docker-scout >/dev/null 2>&1; then
+          docker scout cves mcp-docs-server:scan --format json --output scout-results.json || true
+        else
+          echo "Docker Scout not available, skipping..."
+        fi
+
+  performance-test:
+    name: Performance Test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'performance')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Create test secrets
+      run: |
+        mkdir -p secrets
+        echo "dummy-token-for-testing" > secrets/github_token.txt
+        chmod 600 secrets/github_token.txt
+        
+    - name: Build and start services
+      run: |
+        docker-compose -f docker-compose.test.yml up -d mcp-docs-server-test
+        
+    - name: Wait for service
+      run: |
+        timeout 180 bash -c '
+          until docker-compose -f docker-compose.test.yml exec -T mcp-docs-server-test curl -f http://localhost:3000/health; do
+            sleep 5
+          done
+        '
+        
+    - name: Run performance tests
+      run: |
+        docker-compose -f docker-compose.test.yml run --rm integration-tests npm run test:integration -- --testNamePattern="Performance"
+        
+    - name: Cleanup
+      if: always()
+      run: |
+        docker-compose -f docker-compose.test.yml down --volumes --remove-orphans
