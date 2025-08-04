@@ -12,16 +12,16 @@ This MCP server enhances Claude Code's capabilities by providing real-time acces
 
 ## Features
 
-- 🔍 **Intelligent Search** - Search across multiple documentation sources simultaneously with smart query-to-API mapping
-- 📚 **API Reference Lookup** - Get detailed documentation for specific APIs and methods from real sources
-- 💡 **Example Finder** - Locate relevant code examples with syntax highlighting
-- 🔄 **Migration Guides** - Version-to-version upgrade assistance
-- ⚡ **Advanced Caching** - Two-tier caching (memory + file) for optimal performance
-- 🔒 **Security Hardened** - SSRF protection, XSS prevention, input validation, and secure file operations
-- 🌐 **Dual Transport** - Supports both stdio and HTTP SSE transport for flexible deployment
-- 🐳 **Docker Ready** - Production deployment with Docker Compose and security best practices
-- 🏥 **Health Monitoring** - Built-in health check endpoint at `/health`
-- ✅ **Production-Ready Testing** - 54 comprehensive integration tests validating real documentation scraping
+- **Intelligent Search** - Search across multiple documentation sources simultaneously with smart query-to-API mapping
+- **API Reference Lookup** - Get detailed documentation for specific APIs and methods from real sources
+- **Example Finder** - Locate relevant code examples with syntax highlighting
+- **Migration Guides** - Version-to-version upgrade assistance
+- **Advanced Caching** - Two-tier caching (memory + file) for optimal performance
+- **Security Hardened** - SSRF protection, XSS prevention, input validation, and secure file operations
+- **Dual Transport** - Supports both stdio and HTTP SSE transport for flexible deployment
+- **Docker Ready** - Production deployment with Docker Compose and security best practices
+- **Health Monitoring** - Built-in health check endpoint at `/health`
+- **Production-Ready Testing** - Comprehensive integration tests validating real documentation scraping
 
 ## Architecture
 
@@ -111,19 +111,26 @@ curl http://localhost:3000/health
 ```
 
 The Docker setup includes:
-- 🔐 **Security hardened** - Non-root user, minimal Alpine image
-- 💾 **Persistent storage** - Volumes for cache and logs
-- 🏥 **Health monitoring** - Built-in health checks at `/health`
-- 📊 **Resource limits** - CPU and memory constraints
-- 🔧 **Easy configuration** - All settings via environment variables
+- **Security hardened** - Non-root user, minimal Alpine image
+- **Persistent storage** - Volumes for cache and logs
+- **Health monitoring** - Built-in health checks at `/health`
+- **Resource limits** - CPU and memory constraints
+- **Easy configuration** - All settings via environment variables
 
 See [DOCKER.md](DOCKER.md) for detailed Docker deployment guide.
 
 ## Usage with Claude Code
 
-### 1. Configure Claude Code
+The MCP Documentation Server supports two transport modes for connecting with Claude Code:
 
-Add to your Claude Code MCP configuration:
+1. **Stdio Transport** (Default) - Direct process communication
+2. **HTTP/SSE Transport** - Server-Sent Events over HTTP for web-based clients
+
+### Option 1: Stdio Transport (Recommended)
+
+This is the standard mode for desktop Claude Code installations.
+
+Add to your Claude Code MCP configuration (`claude_desktop_config.json`):
 
 ```json
 {
@@ -140,6 +147,62 @@ Add to your Claude Code MCP configuration:
   }
 }
 ```
+
+### Option 2: HTTP/SSE Transport
+
+This mode is ideal for web-based Claude clients, containerized deployments, or when you need to access the server from multiple clients.
+
+#### Step 1: Start the HTTP Server
+
+```bash
+# Start with both stdio and HTTP endpoints
+npm start
+
+# Or using Docker
+docker-compose up -d
+```
+
+The server will start on port 3000 (configurable via `PORT` environment variable) and provide:
+- **Health endpoint**: `GET http://localhost:3000/health`
+- **MCP SSE endpoint**: `GET http://localhost:3000/mcp`
+- **MCP POST endpoint**: `POST http://localhost:3000/mcp?sessionId={sessionId}`
+
+#### Step 2: Configure Claude Code for HTTP Transport
+
+Add to your Claude Code MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "docs": {
+      "sse": {
+        "url": "http://localhost:3000/mcp",
+        "timeout": 30000
+      },
+      "env": {
+        "DOCS_ELECTRON_URL": "https://www.electronjs.org",
+        "DOCS_REACT_URL": "https://react.dev",
+        "DOCS_NODE_URL": "https://nodejs.org"
+      }
+    }
+  }
+}
+```
+
+#### Step 3: Connection Flow
+
+The HTTP/SSE transport works as follows:
+
+1. **Establish SSE Connection**: Claude Code connects to `GET /mcp` and receives a session ID
+2. **Send Messages**: Claude Code sends JSON-RPC messages to `POST /mcp?sessionId={sessionId}`
+3. **Receive Responses**: The server responds with JSON-RPC responses over HTTP
+
+#### When to Use Each Transport Mode
+
+| Transport | Use Case | Benefits | Considerations |
+|-----------|----------|----------|----------------|
+| **Stdio** | Desktop Claude Code, local development | Simple setup, direct communication | Process-based, single client |
+| **HTTP/SSE** | Web clients, Docker, multiple clients | Web-compatible, scalable, health checks | Requires HTTP server, network overhead |
 
 ### 2. Available Tools
 
@@ -227,7 +290,7 @@ npm run lint
 
 ### Testing
 
-The project includes a comprehensive Docker-based integration test suite with **54 tests validating real documentation scraping**:
+The project includes a comprehensive Docker-based integration test suite:
 
 ```bash
 # Run all tests (unit + integration)
@@ -243,28 +306,15 @@ docker-compose -f docker-compose.test.yml up --build
 cd tests/integration && npm run test:integration
 ```
 
-**Test Architecture (54 tests total):**
-- 🏗️ **MCP Protocol Tests** (15 tests) - Full MCP specification compliance
-- 🌐 **HTTP Transport Tests** (6 tests) - SSE connection and CORS validation
-- 🔍 **Real Documentation Tests** (8 tests) - **Validates actual content scraping from Electron, React, etc.**
-- 🛡️ **Security Tests** (12 tests) - XSS, injection, DoS protection, session isolation
-- 🏥 **Health Check Tests** (5 tests) - System health and monitoring
-- 🔧 **MCP Tools Tests** (8 tests) - Core functionality validation
+**Test Coverage:**
+- **MCP Protocol Tests** - Full MCP specification compliance
+- **HTTP Transport Tests** - SSE connection and CORS validation
+- **Real Documentation Tests** - Validates actual content scraping from documentation sources
+- **Security Tests** - XSS, injection, DoS protection, session isolation
+- **Health Check Tests** - System health and monitoring
+- **MCP Tools Tests** - Core functionality validation
 
-**Test Results:**
-- ✅ **54/54 tests passing** (0 failures, 0 errors)
-- ⏱️ **5.5 second execution time**
-- 🔍 **Real documentation content verified** - Tests confirm actual scraping of Electron API docs, not just mock responses
-- 🛡️ **Production security standards met**
-
-**Quick Testing:**
-```bash
-# Full integration test suite with real documentation validation
-docker-compose -f docker-compose.test.yml up --build
-
-# View test results
-cat test-results/integration-results.xml
-```
+The test suite validates real documentation scraping, ensuring the server correctly parses and returns actual content from documentation sources.
 
 See [TESTING.md](TESTING.md) for detailed testing guide and architecture.
 
@@ -272,12 +322,12 @@ See [TESTING.md](TESTING.md) for detailed testing guide and architecture.
 
 1. **Create a scraper** in `src/scrapers/`:
    ```typescript
-   // src/scrapers/my-docs.ts
+   // src/scrapers/custom-docs.ts
    import { BaseScraper } from './base.js';
    
-   export class MyDocsScraper extends BaseScraper {
+   export class CustomDocsScraper extends BaseScraper {
      constructor(config: ScraperConfig) {
-       super(config, 'my-docs');
+       super(config, 'custom-docs');
      }
      
      async scrape(params: Record<string, any>): Promise<ScraperResult> {
@@ -290,29 +340,29 @@ See [TESTING.md](TESTING.md) for detailed testing guide and architecture.
 
 2. **Add configuration** in `.env`:
    ```bash
-   DOCS_MYDOCS_URL=https://mydocs.com
+   DOCS_CUSTOM_URL=https://customdocs.com
    ```
 
 3. **Register the scraper** in the server configuration
 
 ## Security Features
 
-- 🛡️ **SSRF Protection** - Blocks requests to private networks and localhost
-- 🔐 **Input Validation** - All inputs sanitized and validated with Zod schemas
-- 🚫 **XSS Prevention** - Script tags and JavaScript URLs automatically sanitized
-- 🔒 **Path Traversal Protection** - Source parameter validation prevents directory traversal
-- 📝 **Secure Logging** - Sensitive data automatically redacted from logs
-- 📁 **File Security** - Restricted permissions and path traversal protection
-- 🚫 **Error Handling** - Safe error messages that don't expose internal details or stack traces
-- 🛡️ **Session Isolation** - Unique session IDs with proper session management
-- ⚡ **DoS Protection** - Request size limits and rate limiting to prevent abuse
+- **SSRF Protection** - Blocks requests to private networks and localhost
+- **Input Validation** - All inputs sanitized and validated with Zod schemas
+- **XSS Prevention** - Script tags and JavaScript URLs automatically sanitized
+- **Path Traversal Protection** - Source parameter validation prevents directory traversal
+- **Secure Logging** - Sensitive data automatically redacted from logs
+- **File Security** - Restricted permissions and path traversal protection
+- **Error Handling** - Safe error messages that don't expose internal details or stack traces
+- **Session Isolation** - Unique session IDs with proper session management
+- **DoS Protection** - Request size limits and rate limiting to prevent abuse
 
 ## Performance
 
-- ⚡ **Two-Tier Caching** - Memory cache + persistent file storage
-- 📊 **Rate Limiting** - Configurable per-source request limits
-- 🔄 **Concurrent Processing** - Batch requests with controlled concurrency
-- ⏱️ **Smart TTL** - Different cache durations for different content types
+- **Two-Tier Caching** - Memory cache + persistent file storage
+- **Rate Limiting** - Configurable per-source request limits
+- **Concurrent Processing** - Batch requests with controlled concurrency
+- **Smart TTL** - Different cache durations for different content types
 
 **Cache TTL by Content Type:**
 - Search results: 30 minutes
@@ -322,10 +372,11 @@ See [TESTING.md](TESTING.md) for detailed testing guide and architecture.
 
 ## Documentation
 
-- 📖 **[API.md](docs/API.md)** - Complete API reference for all MCP tools
-- ⚙️ **[CONFIGURATION.md](docs/CONFIGURATION.md)** - Detailed configuration guide
-- 🐳 **[DOCKER.md](DOCKER.md)** - Docker deployment guide
-- 🧪 **[tests/README.md](tests/README.md)** - Testing guide and best practices
+- **[API.md](docs/API.md)** - Complete API reference for all MCP tools
+- **[CONFIGURATION.md](docs/CONFIGURATION.md)** - Detailed configuration guide
+- **[CLIENT_EXAMPLES.md](docs/CLIENT_EXAMPLES.md)** - Practical client examples for both stdio and HTTP transports
+- **[DOCKER.md](DOCKER.md)** - Docker deployment guide
+- **[tests/README.md](tests/README.md)** - Testing guide and best practices
 
 ## Monitoring & Troubleshooting
 
@@ -416,31 +467,27 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## Roadmap
 
 ### Current Version (1.0.0)
-- ✅ Core MCP tools implementation (search, API reference, examples, migration)
-- ✅ Multi-source documentation scraping (Electron, React, Node.js, GitHub)
-- ✅ Advanced caching system (two-tier memory + file storage)
-- ✅ Security hardening (SSRF, XSS, DoS protection, input validation)
-- ✅ Dual transport support (stdio + HTTP SSE transport)
-- ✅ Production-ready testing (54 comprehensive integration tests)
-- ✅ Real documentation validation (actual content scraping verified)
-- ✅ Docker deployment with security best practices
+- Core MCP tools implementation (search, API reference, examples, migration)
+- Multi-source documentation scraping (Electron, React, Node.js, GitHub)
+- Advanced caching system (two-tier memory + file storage)
+- Security hardening (SSRF, XSS, DoS protection, input validation)
+- Dual transport support (stdio + HTTP SSE transport)
+- Production-ready testing with comprehensive integration tests
+- Real documentation validation (actual content scraping verified)
+- Docker deployment with security best practices
 
 ### Future Enhancements
-- [ ] **Additional Sources** - Vue.js, Angular, Python, Rust documentation
-- [ ] **AI Summarization** - Intelligent documentation summaries
-- [ ] **Semantic Search** - Vector-based content search
-- [ ] **Plugin System** - Custom documentation source plugins
-- [ ] **Real-time Sync** - Live documentation updates
-- [ ] **Analytics** - Usage metrics and performance monitoring
-- [ ] **GraphQL API** - Alternative to MCP protocol
-- [ ] **Web Interface** - Browser-based documentation explorer
+- **Additional Sources** - Vue.js, Angular, Python, Rust documentation
+- **AI Summarization** - Intelligent documentation summaries
+- **Semantic Search** - Vector-based content search
+- **Plugin System** - Custom documentation source plugins
+- **Real-time Sync** - Live documentation updates
+- **Analytics** - Usage metrics and performance monitoring
+- **GraphQL API** - Alternative to MCP protocol
+- **Web Interface** - Browser-based documentation explorer
 
 ## Support
 
-- 📧 **Issues**: [GitHub Issues](https://github.com/Liquescent-Development/mcp-docs-server/issues)
-- 📚 **Documentation**: [docs/](docs/) directory
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/Liquescent-Development/mcp-docs-server/discussions)
-
----
-
-**Built with ❤️ for the Claude Code community**
+- **Issues**: [GitHub Issues](https://github.com/Liquescent-Development/mcp-docs-server/issues)
+- **Documentation**: [docs/](docs/) directory
+- **Discussions**: [GitHub Discussions](https://github.com/Liquescent-Development/mcp-docs-server/discussions)
