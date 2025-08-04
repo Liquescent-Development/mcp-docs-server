@@ -19,7 +19,7 @@ RUN npm ci --ignore-scripts
 COPY . .
 
 # Build TypeScript
-RUN npm run build
+RUN npx tsc --version && npx tsc -p .
 
 # Production stage
 FROM node:20.19.4-alpine3.22 AS production
