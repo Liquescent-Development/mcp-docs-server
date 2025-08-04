@@ -11,9 +11,50 @@ The MCP Documentation Server provides four main tools for accessing technical do
 - `find_examples` - Find code examples for specific topics
 - `get_migration_guide` - Get version migration guides
 
+## Transport Modes
+
+The server supports two transport modes for MCP communication:
+
+### 1. Stdio Transport (Default)
+- **Protocol**: MCP over stdio streams
+- **Usage**: Desktop Claude Code applications
+- **Configuration**: Command-line execution with stdio pipes
+- **Authentication**: Process-level isolation
+
+### 2. HTTP/SSE Transport
+- **Protocol**: MCP over HTTP with Server-Sent Events
+- **Usage**: Web clients, containerized deployments, multiple clients
+- **Configuration**: HTTP server with SSE for real-time communication
+- **Authentication**: HTTP-based (headers, tokens)
+
 ## Authentication
 
-The server uses the Model Context Protocol (MCP) for communication. No additional authentication is required beyond the MCP connection.
+### Stdio Transport
+No additional authentication is required beyond the MCP connection. Security is provided through process isolation.
+
+### HTTP/SSE Transport
+Authentication can be configured through:
+- HTTP headers (Authorization bearer tokens)
+- CORS policies for web clients
+- IP-based restrictions
+- Session-based authentication
+
+#### Example HTTP Authentication
+```json
+{
+  "mcpServers": {
+    "docs": {
+      "sse": {
+        "url": "https://your-server.com/mcp",
+        "headers": {
+          "Authorization": "Bearer your-api-token",
+          "X-Client-Version": "1.0.0"
+        }
+      }
+    }
+  }
+}
+```
 
 ## Supported Documentation Sources
 
@@ -21,6 +62,164 @@ The server uses the Model Context Protocol (MCP) for communication. No additiona
 - **React**: React library documentation  
 - **Node.js**: Node.js runtime documentation
 - **GitHub**: GitHub repository documentation and API
+
+---
+
+## HTTP/SSE API Endpoints
+
+When using HTTP/SSE transport, the server exposes these HTTP endpoints:
+
+### Health Check Endpoint
+
+**GET /health**
+
+Returns server health status.
+
+```bash
+curl http://localhost:3000/health
+```
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "service": "mcp-docs-server",
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+
+### MCP SSE Connection Endpoint
+
+**GET /mcp**
+
+Establishes a Server-Sent Events connection for MCP communication.
+
+**Headers:**
+- `Accept: text/event-stream`
+- `Cache-Control: no-cache`
+
+```bash
+curl -N -H "Accept: text/event-stream" http://localhost:3000/mcp
+```
+
+**Response:**
+```
+HTTP/1.1 200 OK
+Content-Type: text/event-stream
+Cache-Control: no-cache
+Connection: keep-alive
+
+event: endpoint
+data: /mcp?sessionId=550e8400-e29b-41d4-a716-446655440000
+
+event: message
+data: {"jsonrpc":"2.0","method":"initialized","params":{}}
+```
+
+### MCP Message Endpoint
+
+**POST /mcp?sessionId={sessionId}**
+
+Sends JSON-RPC messages to an active MCP session.
+
+**Parameters:**
+- `sessionId` (required): Session ID from SSE connection
+
+**Headers:**
+- `Content-Type: application/json`
+
+**Example Request:**
+```bash
+curl -X POST "http://localhost:3000/mcp?sessionId=550e8400-e29b-41d4-a716-446655440000" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "search_documentation",
+      "arguments": {
+        "query": "window creation",
+        "sources": ["electron"]
+      }
+    }
+  }'
+```
+
+**Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "# Search Results for \"window creation\"\n\nFound 5 results across electron\n\n## 1. BrowserWindow\n**Source:** electron | **Type:** api\n**URL:** https://electronjs.org/docs/api/browser-window\n\nCreates and manages browser windows..."
+      }
+    ]
+  }
+}
+```
+
+### Connection Flow for HTTP/SSE Transport
+
+1. **Establish SSE Connection**
+   ```javascript
+   const eventSource = new EventSource('http://localhost:3000/mcp');
+   
+   eventSource.onmessage = (event) => {
+     if (event.type === 'endpoint') {
+       const sessionUrl = event.data; // Extract sessionId from URL
+     }
+   };
+   ```
+
+2. **Send MCP Messages**
+   ```javascript
+   const response = await fetch(`http://localhost:3000/mcp?sessionId=${sessionId}`, {
+     method: 'POST',
+     headers: { 'Content-Type': 'application/json' },
+     body: JSON.stringify({
+       jsonrpc: '2.0',
+       id: 1,
+       method: 'initialize',
+       params: {
+         protocolVersion: '2025-06-18',
+         capabilities: { tools: {} },
+         clientInfo: { name: 'web-client', version: '1.0.0' }
+       }
+     })
+   });
+   ```
+
+3. **Handle Responses**
+   ```javascript
+   const result = await response.json();
+   console.log('MCP Response:', result);
+   ```
+
+### Error Responses
+
+HTTP/SSE transport uses standard HTTP status codes and JSON-RPC error formats:
+
+**HTTP Status Codes:**
+- `200 OK`: Successful request
+- `400 Bad Request`: Missing sessionId or invalid JSON
+- `404 Not Found`: Session not found
+- `500 Internal Server Error`: Server processing error
+
+**JSON-RPC Error Format:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "error": {
+    "code": -32602,
+    "message": "Invalid params: query must be a string"
+  }
+}
+```
 
 ---
 
@@ -253,7 +452,7 @@ Get migration guides between different versions of a framework or library.
 #### Example Response
 
 ```markdown
-# Migration Guide: react 17.0.0 ’ 18.0.0
+# Migration Guide: react 17.0.0 ï¿½ 18.0.0
 
 ## Breaking Changes in React 18
 
