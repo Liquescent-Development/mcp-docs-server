@@ -20,7 +20,11 @@
     "noEmit": false,
     "isolatedModules": true,
     "verbatimModuleSyntax": false,
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vitest/globals"],
+    // Additional security-focused options
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true
   },
   "include": [
     "src/**/*"
