@@ -1,0 +1,29 @@
+FROM node:20.19.4-alpine3.22
+
+# Install testing dependencies
+RUN apk update && apk upgrade && \
+    apk add --no-cache curl jq && \
+    rm -rf /var/cache/apk/*
+
+# Create test user
+RUN addgroup -g 1001 -S testuser && \
+    adduser -S testuser -u 1001
+
+WORKDIR /app
+
+# Copy package files for test dependencies
+COPY package*.json ./
+
+# Install all dependencies (including dev dependencies for testing)
+RUN npm install
+
+# Copy test files to the working directory
+COPY . ./
+
+# Create test results directory
+RUN mkdir -p test-results && chown -R testuser:testuser /app
+
+USER testuser
+
+# Default command - run vitest with the integration config
+CMD ["npx", "vitest", "run", "--config", "./vitest.config.js"]

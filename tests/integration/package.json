@@ -1,0 +1,22 @@
+{
+  "name": "mcp-docs-server-integration-tests",
+  "version": "1.0.0",
+  "description": "Integration tests for MCP Documentation Server",
+  "type": "module",
+  "scripts": {
+    "test:integration": "vitest run --reporter=verbose --reporter=junit --outputFile=/app/test-results/integration-results.xml",
+    "test:integration:watch": "vitest --reporter=verbose",
+    "test:health": "node tests/health.test.js",
+    "test:mcp": "node tests/mcp-tools.test.js"
+  },
+  "dependencies": {
+    "vitest": "^1.6.0",
+    "@vitest/ui": "^1.6.0",
+    "axios": "^1.7.2",
+    "ws": "^8.17.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.8",
+    "@types/ws": "^8.5.10"
+  }
+}

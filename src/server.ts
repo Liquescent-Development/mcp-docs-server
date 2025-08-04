@@ -1,5 +1,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { ServerResponse } from 'http';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -332,11 +334,73 @@ export class MCPDocsServer {
   async start(): Promise<void> {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    logger.info('MCP Documentation Server started');
+    logger.info('MCP Documentation Server started with stdio transport');
+  }
+
+  /**
+   * Start the server with HTTP SSE transport
+   * @param res - HTTP ServerResponse for SSE connection
+   * @param endpoint - The endpoint path for POST messages
+   * @returns The SSE transport instance for handling HTTP requests
+   */
+  async startHttp(res: ServerResponse, endpoint: string = '/mcp'): Promise<SSEServerTransport> {
+    const transport = new SSEServerTransport(endpoint, res);
+    await this.server.connect(transport);
+    logger.info('MCP Documentation Server started with HTTP SSE transport');
+    return transport;
   }
 
   async stop(): Promise<void> {
     await this.cache.clear();
     logger.info('MCP Documentation Server stopped');
+  }
+
+  // Public methods to access tools for HTTP JSON-RPC handler
+  async executeSearchTool(params: any): Promise<any> {
+    const result = await this.searchTool.search(params);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: this.formatSearchResult(result)
+        }
+      ]
+    };
+  }
+
+  async executeDocumentationTool(params: any): Promise<any> {
+    const result = await this.docTool.getApiReference(params);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: result ? this.formatDocumentationEntry(result) : 'No documentation found for the specified API.'
+        }
+      ]
+    };
+  }
+
+  async executeExamplesTool(params: any): Promise<any> {
+    const results = await this.examplesTool.findExamples(params);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: this.formatExamples(results)
+        }
+      ]
+    };
+  }
+
+  async executeMigrationTool(params: any): Promise<any> {
+    const results = await this.migrationTool.getMigrationGuide(params);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: this.formatMigrationGuide(results, params)
+        }
+      ]
+    };
   }
 }

@@ -26,6 +26,10 @@ export class ElectronScraper extends BaseScraper {
         // Scrape examples for a topic
         const exampleEntries = await this.scrapeExamples(params.topic);
         entries.push(...exampleEntries);
+      } else if (params.query) {
+        // Handle search queries - try to find relevant API pages
+        const searchEntries = await this.scrapeSearchQuery(params.query);
+        entries.push(...searchEntries);
       } else {
         // Default: scrape main documentation index
         const indexEntries = await this.scrapeDocumentationIndex();
@@ -48,39 +52,63 @@ export class ElectronScraper extends BaseScraper {
     const parser = this.parseHtml(html, url);
     const entries: DocumentationEntry[] = [];
 
-    // Parse API documentation structure
-    const apiSections = parser.parseApiDocs({
-      selectors: {
-        title: '.page-title, h1',
-        content: '.markdown-body',
-        sections: '.api-section, .method-detail, .property-detail'
-      }
-    });
-
-    for (const section of apiSections) {
-      if (section.title && section.content) {
-        entries.push(this.createEntry(
-          section.title,
-          section.content,
-          url,
-          'api',
-          { parsedFrom: 'electron-docs' }
-        ));
+    // Handle modern Electron docs structure (Docusaurus-based)
+    const title = parser.$('h1').first().text().trim() || 
+                  parser.$('[data-rh="true"] title').text().split(' | ')[0] ||
+                  'Electron Documentation';
+    
+    // Extract main content from the documentation page
+    let content = '';
+    
+    // Try different content containers
+    const contentSelectors = [
+      '.theme-doc-markdown.markdown',
+      '.markdown',
+      'main .container',
+      'article',
+      '.docItemContainer_Djhp'
+    ];
+    
+    for (const selector of contentSelectors) {
+      const contentElement = parser.$(selector);
+      if (contentElement.length > 0) {
+        content = parser.extractContent(contentElement);
+        break;
       }
     }
+    
+    // If no content found with selectors, get text content from body
+    if (!content) {
+      // Remove navigation, headers, footers, and script elements
+      parser.$('nav, header, footer, script, style, .navbar, .sidebar, .breadcrumbs').remove();
+      content = parser.$('body').text().trim();
+      
+      // Clean up excessive whitespace
+      content = content.replace(/\s+/g, ' ').substring(0, 5000);
+    }
 
-    // Parse code examples
+    if (title && content && content.length > 50) {
+      entries.push(this.createEntry(
+        title,
+        content,
+        url,
+        'api',
+        { parsedFrom: 'electron-docs-modern' }
+      ));
+    }
+
+    // Parse code examples from pre/code blocks
     const examples = parser.parseCodeExamples();
     for (const example of examples) {
-      if (example.code) {
+      if (example.code && example.code.length > 10) {
         entries.push(this.createEntry(
-          example.description || 'Code Example',
+          example.description || `Code Example from ${title}`,
           example.code,
           url,
           'example',
           { 
             language: example.language || 'javascript',
-            parsedFrom: 'electron-docs'
+            parsedFrom: 'electron-docs-modern'
           }
         ));
       }
@@ -95,17 +123,27 @@ export class ElectronScraper extends BaseScraper {
 
   private async scrapeApi(apiName: string, version?: string): Promise<DocumentationEntry[]> {
     const versionPath = version || 'latest';
-    const apiUrl = `/docs/${versionPath}/api/${apiName.toLowerCase()}`;
     
-    try {
-      const html = await this.fetchHtml(apiUrl);
-      return this.parse(html, new URL(apiUrl, this.config.baseUrl).toString());
-    } catch (error) {
-      // Try alternative URL patterns
-      const alternativeUrl = `/docs/${versionPath}/api/${apiName}`;
-      const html = await this.fetchHtml(alternativeUrl);
-      return this.parse(html, new URL(alternativeUrl, this.config.baseUrl).toString());
+    // Try different API name formats
+    const possibleNames = [
+      apiName.toLowerCase(),
+      apiName.toLowerCase().replace(/([A-Z])/g, '-$1').toLowerCase(), // camelCase to kebab-case
+      apiName
+    ];
+    
+    for (const name of possibleNames) {
+      try {
+        const apiUrl = `/docs/${versionPath}/api/${name}`;
+        const html = await this.fetchHtml(apiUrl);
+        return this.parse(html, new URL(apiUrl, this.config.baseUrl).toString());
+      } catch (error) {
+        // Try next format
+        continue;
+      }
     }
+    
+    // If all formats fail, return empty array
+    return [];
   }
 
   private async scrapeMigrationGuide(fromVersion: string, toVersion: string): Promise<DocumentationEntry[]> {
@@ -143,29 +181,77 @@ export class ElectronScraper extends BaseScraper {
     return entries.filter(entry => entry.type === 'example');
   }
 
-  private async scrapeDocumentationIndex(): Promise<DocumentationEntry[]> {
-    const indexUrl = '/docs/latest/api/';
-    const html = await this.fetchHtml(indexUrl);
-    const parser = this.parseHtml(html, new URL(indexUrl, this.config.baseUrl).toString());
-    
+  private async scrapeSearchQuery(query: string): Promise<DocumentationEntry[]> {
+    const queryLower = query.toLowerCase();
     const entries: DocumentationEntry[] = [];
     
-    // Parse the index page to get all API links
-    parser.$('.api-index-list a, .sidebar-link').each((_, element) => {
-      const $el = parser.$(element);
-      const href = $el.attr('href');
-      const title = $el.text().trim();
-      
-      if (href && title) {
-        entries.push(this.createEntry(
-          title,
-          `API Reference: ${title}`,
-          new URL(href, this.config.baseUrl).toString(),
-          'api',
-          { isIndex: true }
-        ));
+    // Map common search terms to specific API endpoints
+    const queryToApiMap: Record<string, string[]> = {
+      'app': ['app'],
+      'window': ['browser-window'],
+      'browserwindow': ['browser-window'],
+      'browser': ['browser-window'],
+      'web': ['web-contents'],
+      'webcontents': ['web-contents'],
+      'menu': ['menu'],
+      'dialog': ['dialog'],
+      'ipc': ['ipc-main', 'ipc-renderer'],
+      'main': ['ipc-main'],
+      'process': ['process'],
+      'shell': ['shell'],
+      'clipboard': ['clipboard'],
+      'screen': ['screen'],
+      'notification': ['notification'],
+      'tray': ['tray']
+    };
+    
+    // Find relevant APIs based on the query
+    const relevantApis = new Set<string>();
+    
+    // Direct matches
+    for (const [term, apis] of Object.entries(queryToApiMap)) {
+      if (queryLower.includes(term)) {
+        apis.forEach(api => relevantApis.add(api));
       }
-    });
+    }
+    
+    // If no specific matches, try common APIs
+    if (relevantApis.size === 0) {
+      ['app', 'browser-window', 'web-contents'].forEach(api => relevantApis.add(api));
+    }
+    
+    // Scrape the relevant API pages
+    for (const apiName of Array.from(relevantApis)) {
+      try {
+        const apiUrl = `/docs/latest/api/${apiName}`;
+        const html = await this.fetchHtml(apiUrl);
+        const parsed = this.parse(html, new URL(apiUrl, this.config.baseUrl).toString());
+        entries.push(...parsed);
+      } catch (error) {
+        // Skip APIs that don't exist or can't be fetched
+        continue;
+      }
+    }
+    
+    return entries;
+  }
+
+  private async scrapeDocumentationIndex(): Promise<DocumentationEntry[]> {
+    // Try common API endpoints that we know exist
+    const commonApis = ['app', 'browser-window', 'web-contents', 'menu', 'dialog'];
+    const entries: DocumentationEntry[] = [];
+    
+    for (const apiName of commonApis) {
+      try {
+        const apiUrl = `/docs/latest/api/${apiName}`;
+        const html = await this.fetchHtml(apiUrl);
+        const parsed = this.parse(html, new URL(apiUrl, this.config.baseUrl).toString());
+        entries.push(...parsed);
+      } catch (error) {
+        // Skip APIs that don't exist or can't be fetched
+        continue;
+      }
+    }
     
     return entries;
   }

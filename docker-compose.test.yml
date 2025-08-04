@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  mcp-docs-server-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NODE_ENV=test
+      # Mount dist directory for faster builds during testing
+      # Remove this line when running in CI/CD
+      cache_from:
+        - type=local,src=dist
+    image: mcp-docs-server:test
+    container_name: mcp-docs-server-test
+    environment:
+      # Server Configuration
+      - NODE_ENV=test
+      - PORT=3000
+      
+      # Documentation Sources
+      - DOCS_ELECTRON_URL=https://www.electronjs.org
+      - DOCS_REACT_URL=https://react.dev
+      - DOCS_NODE_URL=https://nodejs.org
+      - DOCS_GITHUB_URL=https://docs.github.com
+      
+      # Test-specific configuration
+      - CACHE_TTL=60
+      - CACHE_STORAGE=memory
+      - RATE_LIMIT_PER_MINUTE=120
+      - LOG_LEVEL=debug
+    ports:
+      - "3001:3000"
+    volumes:
+      # Use tmpfs for test cache to avoid persistence
+      - type: tmpfs
+        target: /app/cache
+        tmpfs:
+          size: 100M
+      - type: tmpfs
+        target: /app/logs
+        tmpfs:
+          size: 50M
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # Integration test runner
+  integration-tests:
+    build:
+      context: ./tests/integration
+      dockerfile: Dockerfile.test
+    container_name: integration-tests
+    depends_on:
+      mcp-docs-server-test:
+        condition: service_healthy
+    environment:
+      - MCP_SERVER_URL=http://mcp-docs-server-test:3000
+      - NODE_ENV=test
+    volumes:
+      - ./tests/integration:/app/tests
+      - ./test-results:/app/test-results
+    networks:
+      - test-network
+    command: npm run test:integration
+
+networks:
+  test-network:
+    driver: bridge
+
+volumes:
+  test-results:
