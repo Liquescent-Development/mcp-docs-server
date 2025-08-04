@@ -1,6 +1,9 @@
 # Build stage - Pin to specific version and update packages
 FROM node:20.19.4-alpine3.22 AS builder
 
+# Accept build arg for NODE_ENV
+ARG NODE_ENV=production
+
 # Update Alpine packages and install build dependencies
 RUN apk update && apk upgrade && \
     apk add --no-cache python3 make g++ && \
@@ -12,8 +15,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install all dependencies (including dev)
-RUN npm ci --ignore-scripts
+# Install all dependencies (including dev dependencies for build)
+RUN npm ci
 
 # Copy source code
 COPY . .
@@ -39,8 +42,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install only production dependencies (skip prepare script)
-RUN npm ci --only=production --ignore-scripts && \
+# Install only production dependencies
+RUN npm ci --omit=dev && \
     npm cache clean --force
 
 # Copy built application from builder
